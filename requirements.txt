@@ -1,3 +1,7 @@
-requests
-configparser
-psycopg2
+certifi==2018.8.24
+chardet==3.0.4
+configparser==3.5.0
+idna==2.7
+psycopg2==2.7.5
+requests==2.19.1
+urllib3==1.23
