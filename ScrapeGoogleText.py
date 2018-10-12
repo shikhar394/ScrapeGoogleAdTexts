@@ -6,6 +6,7 @@ import psycopg2.extras
 import sys
 from email.mime.text import MIMEText
 import smtplib
+import time
 
 if len(sys.argv) < 2:
     exit("Usage:python3 ScrapeGoogleText.py ScrapeGoogleText.cfg")
@@ -29,12 +30,6 @@ cursor = connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
 CREATIVE_ID_POS = -1
 ADVERTISER_ID_POS = -3 
 
-SAMPLELINKS = ["https://transparencyreport.google.com/political-ads/library/advertiser/AR10924747533582336/creative/CR405266791858700288", 
-    "https://transparencyreport.google.com/political-ads/library/advertiser/AR194446432348930048/creative/CR168700268072927232", 
-    "https://transparencyreport.google.com/political-ads/library/advertiser/AR201201831789985792/creative/CR107466266498826240", 
-    "https://transparencyreport.google.com/political-ads/library/advertiser/AR201201831789985792/creative/CR177940563792756736", 
-    "https://transparencyreport.google.com/political-ads/library/advertiser/AR201201831789985792/creative/CR187840566489251840"]
-
 LINKWITHTEXT = 'https://transparencyreport.google.com/transparencyreport/api/v3/politicalads/creatives/details?entity_id=%s&creative_id=%s'
 
 
@@ -48,7 +43,10 @@ def ExtractIDs(ad_url):
 
     Extracts the AR/CR tokens from the link. 
     """
-    ad_url = ad_url.split('/')
+    if type(ad_url) == str:   
+        ad_url = ad_url.split('/')
+    else:
+        ad_url = ad_url[0].split('/')
     if ad_url[-3].startswith('AR') and ad_url[-1].startswith('CR'):
         return ad_url[ADVERTISER_ID_POS], ad_url[CREATIVE_ID_POS]
     else:
@@ -69,10 +67,14 @@ def GetLinks():
     """
     Query = "select ad_url from creative_stats"
     cursor.execute(Query)
-    Links = []
+    Links = {}
+    AdsScraped = set()
     for ad_url in cursor:
         AdvertiserID, CreativeID = ExtractIDs(ad_url)
-        Links.append(LINKWITHTEXT % (AdvertiserID, CreativeID))
+        Links[CreativeID] = {}
+        Links[CreativeID]['Link'] = LINKWITHTEXT % (AdvertiserID, CreativeID)
+        Links[CreativeID]['Advertiser'] = AdvertiserID
+    print(Links)
     return Links
 
 
@@ -156,6 +158,7 @@ def CategorizeText(RelevantPayload):
     Categorizes the text returned from the website. 
     As of 10/13/18, the last element is the link, the one before that is the body, the rest is the title. 
     """
+    print(RelevantPayload)
     AdvertiserLink = RelevantPayload.pop()
     Body = RelevantPayload.pop()
     Title = ' | '.join(RelevantPayload)
@@ -171,12 +174,15 @@ def InsertNewEntriesToDB(AdvertisementCopies):
     """
     Query = "INSERT into ad_copies (advertisement_id, advertiser_id, title, body, advertiser_link) VALUES "
     Params = []
+    print(AdvertisementCopies)
+    time.sleep(3)
     for AdvertisementID in AdvertisementCopies:
         if AdvertisementCopies[AdvertisementID] != -1:
             Title = AdvertisementCopies[AdvertisementID]['Title']
             Body = AdvertisementCopies[AdvertisementID]['Body']
             AdvertiserLink = AdvertisementCopies[AdvertisementID]['AdvertiserLink']
-            Params.append(cursor.mogrify("(%s, %s, %s, %s, %s)", (AdvertisementID, Title, Body, AdvertiserLink)))
+            AdvertiserID = AdvertisementCopies[AdvertisementID]['AdvertiserID']
+            Params.append(cursor.mogrify("(%s, %s, %s, %s, %s)", (AdvertisementID, AdvertiserID, Title, Body, AdvertiserLink)).decode('utf-8'))
     Query += ','.join(Params)
     print(Query)
     cursor.execute(Query)
@@ -187,17 +193,15 @@ def InsertNewEntriesToDB(AdvertisementCopies):
 
 
 if __name__ == "__main__":
-    LinksFromDB = GetLinks()
+    LinksFromDB  = GetLinks() # {CreativeID: Link}
     if LinksFromDB:
         AdvertisementCopies = {} # {AdvertisementID: {'Title': 'XXXX', 'Body': 'XXXX', 'AdvertiserLink': 'XXXX', 'AdvertiserID': 'XXX'}}
         CacheExistingAdIDs(AdvertisementCopies)
         with requests.session() as Session:
-            for Link in SAMPLELINKS:
-                AdvertiserID, AdvertisementID = ExtractIDs(Link)
-                if not AdvertisementCopies.get(AdvertisementID, False):
-                    LinkToScrape = LINKWITHTEXT % (AdvertiserID, AdvertisementID) 
+            for AdID in LinksFromDB:
+                if not AdvertisementCopies.get(AdID, False):
                     try:
-                        Payload = Session.get(LinkToScrape)
+                        Payload = Session.get(LinksFromDB[AdID]['Link'])
                         if Payload.status_code != 200:
                             SendErrorEmail("Not 200 code on " + Link)
                     except Exception as e:  
@@ -205,12 +209,13 @@ if __name__ == "__main__":
                     Payload = FlattenData(Payload.text)
                     RelevantPayload = ExtractRelevantText(Payload)
                     Title, Body, AdvertiserLink = CategorizeText(RelevantPayload)
-                    AdvertisementCopies[AdvertisementID] = {
+                    AdvertisementCopies[AdID] = {
                         'Title': Title,
                         'Body': Body,
                         'AdvertiserLink': AdvertiserLink,
-                        'AdvertiserID': AdvertiserID
+                        'AdvertiserID': LinksFromDB[AdID]['Advertiser']
                     }
+                    print(AdvertisementCopies)
         
         InsertNewEntriesToDB(AdvertisementCopies)
         connection.close()
