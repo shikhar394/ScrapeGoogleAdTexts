@@ -168,6 +168,7 @@ def CategorizeText(RelevantPayload):
     AdvertiserLink = ''
     for element in RelevantPayload:
         if element.startswith('http'):
+            print('linkbody')
             if element.endswith(RecognizedImageFormats):
                 ImageURL = element
             elif element.endswith(RecognizedVideoFormats):
@@ -180,9 +181,11 @@ def CategorizeText(RelevantPayload):
             if element.startswith('https:/'):
                 TextBody = False
         if TextBody:
+            print('textbody')
             AdvertiserLink = RelevantPayload.pop()
             Body = RelevantPayload.pop()
             Title = ' | '.join(RelevantPayload)
+
         
     return Title, Body, AdvertiserLink, ImageURL, VideoURL
 
@@ -222,6 +225,7 @@ if __name__ == "__main__":
             for AdID in AdDetailsFromDB:
                 Count += 1
                 print("Ad # ", Count, " out of ", len(AdDetailsFromDB))
+                print(AdDetailsFromDB[AdID]['OriginalLink'])
                 if not AdvertisementCopies.get(AdID, False):
                     try:
                         Payload = Session.get(AdDetailsFromDB[AdID]['Link'])
