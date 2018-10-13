@@ -7,6 +7,7 @@ import sys
 from email.mime.text import MIMEText
 import smtplib
 import time
+import random
 
 if len(sys.argv) < 2:
     exit("Usage:python3 ScrapeGoogleText.py ScrapeGoogleText.cfg")
@@ -69,7 +70,6 @@ def GetDetails():
     Query = "select ad_url from creative_stats"
     cursor.execute(Query)
     AdDetailsFromDB = {}
-    AdsScraped = set()
     for ad_url in cursor:
         AdvertiserID, CreativeID = ExtractIDs(ad_url)
         AdDetailsFromDB[CreativeID] = {}
@@ -200,7 +200,7 @@ def InsertNewEntriesToDB(AdvertisementCopies):
     ParamsForAdCopies = []
     InsertIntoAdLinksQuery = "INSERT into all_ad_links (advertisement_id, link) VALUES "
     ParamsForAdLinks = []
-    time.sleep(3)
+    print(AdvertisementCopies)
     for AdvertisementID in AdvertisementCopies:
         if AdvertisementCopies[AdvertisementID] != -1:
             Title = AdvertisementCopies[AdvertisementID]['Title']
@@ -233,7 +233,7 @@ def InsertNewEntriesToDB(AdvertisementCopies):
 
 if __name__ == "__main__":
     StartTime = time.time()
-    AdDetailsFromDB  = GetDetails() # {CreativeID: Link}
+    AdDetailsFromDB  = GetDetails() # {CreativeID: {'Link': 'XXX', 'OriginalLink':'XXX', 'AdvertiserID':'XXX'}
     Count = 0
     if AdDetailsFromDB:
         AdvertisementCopies = {} # {AdvertisementID: {'Title': 'XXXX', 'Body': 'XXXX', 'AdvertiserLink': 'XXXX', 'AdvertiserID': 'XXX'}}
@@ -243,6 +243,7 @@ if __name__ == "__main__":
                 Count += 1
                 print("Ad # ", Count, " out of ", len(AdDetailsFromDB))
                 print(AdDetailsFromDB[AdID]['OriginalLink'])
+                time.sleep(random.randint(0,3))
                 if not AdvertisementCopies.get(AdID, False):
                     try:
                         Payload = Session.get(AdDetailsFromDB[AdID]['Link'])
@@ -263,13 +264,9 @@ if __name__ == "__main__":
                             'UnidentifiedString': UnidentifiedString
                         }
                     except Exception as e:  
-                        print(str(e))
-                        print(AdDetailsFromDB[AdID])
-            if Count == 100:
-                print(time.time() - StartTime)
-                connection.close()
-                exit()
+                        SendErrorEmail(str(e) + ' | ' + AdDetailsFromDB[AdID]['Link'])
 
-        #InsertNewEntriesToDB(AdvertisementCopies)
+        InsertNewEntriesToDB(AdvertisementCopies)
         connection.close()
+        print(time.time() - StartTime)
 
