@@ -215,11 +215,16 @@ def InsertNewEntriesToDB(AdvertisementCopies):
             
             for link_to_insert in AdvertisementCopies[AdvertisementID]['AllLinks']:
                 ParamsForAdLinks.append(cursor.mogrify("(%s, %s)", (AdvertisementID, link_to_insert)).decode('utf-8'))
-                
+
     InsertIntoAdCopiesQuery += ','.join(ParamsForAdCopies)
-    cursor.execute(InsertIntoAdCopiesQuery)
     InsertIntoAdLinksQuery += ','.join(ParamsForAdLinks)
+
+    with open("Queries.txt", 'w') as f:
+        f.write(InsertIntoAdCopiesQuery + '\n\n')
+        f.write(InsertIntoAdLinksQuery + '\n\n')
+
     cursor.execute(InsertIntoAdLinksQuery)
+    cursor.execute(InsertIntoAdCopiesQuery)
     connection.commit()
 
 
@@ -227,6 +232,7 @@ def InsertNewEntriesToDB(AdvertisementCopies):
 
 
 if __name__ == "__main__":
+    StartTime = time.time()
     AdDetailsFromDB  = GetDetails() # {CreativeID: Link}
     Count = 0
     if AdDetailsFromDB:
@@ -259,6 +265,10 @@ if __name__ == "__main__":
                     except Exception as e:  
                         print(str(e))
                         print(AdDetailsFromDB[AdID])
+            if Count == 100:
+                print(time.time() - StartTime)
+                connection.close()
+                exit()
 
         #InsertNewEntriesToDB(AdvertisementCopies)
         connection.close()
