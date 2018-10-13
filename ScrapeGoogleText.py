@@ -166,7 +166,7 @@ def CategorizeText(RelevantPayload):
     Title = ''
     Body = ''
     AdvertiserLink = ''
-    AllLink = []
+    AllLinks = []
     TextBody = True
     for element in RelevantPayload:
         if element.startswith('https:/'):
@@ -175,15 +175,16 @@ def CategorizeText(RelevantPayload):
                 ImageURL = element
             elif element.endswith(RecognizedVideoFormats):
                 VideoURL = element
-            AllLink.append(element)
+            AllLinks.append(element)
 
     if TextBody:
         AdvertiserLink = RelevantPayload.pop()
         Body = RelevantPayload.pop()
         Title = ' | '.join(RelevantPayload)
 
-    if not TextBody and len(Payload)>3:
+    if not TextBody and len(RelevantPayload)>3:
         print("Specia")
+        print(RelevantPayload)
 
 
     return Title, Body, AdvertiserLink, ImageURL, VideoURL, AllLinks
@@ -245,7 +246,6 @@ if __name__ == "__main__":
                     except Exception as e:  
                         print(str(e))
                         print(AdDetailsFromDB[AdID])
-                        print(AdvertisementCopies[AdID])
 
         #InsertNewEntriesToDB(AdvertisementCopies)
         connection.close()
