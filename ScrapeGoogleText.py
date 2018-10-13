@@ -166,28 +166,27 @@ def CategorizeText(RelevantPayload):
     Title = ''
     Body = ''
     AdvertiserLink = ''
+    AllLink = []
+    TextBody = True
     for element in RelevantPayload:
-        if element.startswith('http'):
-            print('linkbody')
+        if element.startswith('https:/'):
+            TextBody = False
             if element.endswith(RecognizedImageFormats):
                 ImageURL = element
             elif element.endswith(RecognizedVideoFormats):
                 VideoURL = element
+            AllLink.append(element)
 
-    if len(RelevantPayload) > 3:
-        # It comes with text, body and title.
-        TextBody = True
-        for element in RelevantPayload:
-            if element.startswith('https:/'):
-                TextBody = False
-        if TextBody:
-            print('textbody')
-            AdvertiserLink = RelevantPayload.pop()
-            Body = RelevantPayload.pop()
-            Title = ' | '.join(RelevantPayload)
+    if TextBody:
+        AdvertiserLink = RelevantPayload.pop()
+        Body = RelevantPayload.pop()
+        Title = ' | '.join(RelevantPayload)
 
-        
-    return Title, Body, AdvertiserLink, ImageURL, VideoURL
+    if not TextBody and len(Payload)>3:
+        print("Specia")
+
+
+    return Title, Body, AdvertiserLink, ImageURL, VideoURL, AllLinks
 
 
 
@@ -234,7 +233,7 @@ if __name__ == "__main__":
                     
                         Payload = FlattenData(Payload.text)
                         RelevantPayload = ExtractRelevantText(Payload)
-                        Title, Body, AdvertiserLink, ImageURL, VideoURL = CategorizeText(RelevantPayload)
+                        Title, Body, AdvertiserLink, ImageURL, VideoURL, AllLinks = CategorizeText(RelevantPayload)
                         AdvertisementCopies[AdID] = {
                             'Title': Title,
                             'Body': Body,
