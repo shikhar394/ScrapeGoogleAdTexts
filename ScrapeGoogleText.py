@@ -215,8 +215,9 @@ if __name__ == "__main__":
                             'AdvertiserID': AdDetailsFromDB[AdID]['AdvertiserID']
                         }
                     except Exception as e:  
-                        SendErrorEmail("Error: " + str(e))
+                        print(str(e))
                         print(AdvertisementCopies)
+                        print(AdDetailsFromDB[AdID])
                         break
         
         InsertNewEntriesToDB(AdvertisementCopies)
