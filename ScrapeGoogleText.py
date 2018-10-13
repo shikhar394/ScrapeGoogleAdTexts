@@ -61,21 +61,21 @@ def ExtractIDs(ad_url):
 
 
 
-def GetLinks():    
+def GetDetails():    
     """
     Gets all the URLs from the DB to extract their text. 
+    returns {creative_id:{'Link':'XXX', 'AdvertiserID':'XXX'}}
     """
     Query = "select ad_url from creative_stats"
     cursor.execute(Query)
-    Links = {}
+    AdDetailsFromDB = {}
     AdsScraped = set()
     for ad_url in cursor:
         AdvertiserID, CreativeID = ExtractIDs(ad_url)
-        Links[CreativeID] = {}
-        Links[CreativeID]['Link'] = LINKWITHTEXT % (AdvertiserID, CreativeID)
-        Links[CreativeID]['Advertiser'] = AdvertiserID
-    print(Links)
-    return Links
+        AdDetailsFromDB[CreativeID] = {}
+        AdDetailsFromDB[CreativeID]['Link'] = LINKWITHTEXT % (AdvertiserID, CreativeID)
+        AdDetailsFromDB[CreativeID]['AdvertiserID'] = AdvertiserID
+    return AdDetailsFromDB
 
 
 
@@ -193,29 +193,31 @@ def InsertNewEntriesToDB(AdvertisementCopies):
 
 
 if __name__ == "__main__":
-    LinksFromDB  = GetLinks() # {CreativeID: Link}
-    if LinksFromDB:
+    AdDetailsFromDB  = GetDetails() # {CreativeID: Link}
+    if AdDetailsFromDB:
         AdvertisementCopies = {} # {AdvertisementID: {'Title': 'XXXX', 'Body': 'XXXX', 'AdvertiserLink': 'XXXX', 'AdvertiserID': 'XXX'}}
         CacheExistingAdIDs(AdvertisementCopies)
         with requests.session() as Session:
-            for AdID in LinksFromDB:
+            for AdID in AdDetailsFromDB:
                 if not AdvertisementCopies.get(AdID, False):
                     try:
-                        Payload = Session.get(LinksFromDB[AdID]['Link'])
+                        Payload = Session.get(AdDetailsFromDB[AdID]['Link'])
                         if Payload.status_code != 200:
-                            SendErrorEmail("Not 200 code on " + Link)
+                            SendErrorEmail("Not 200 code on " + AdDetailsFromDB[AdID]['Link'])
+                    
+                        Payload = FlattenData(Payload.text)
+                        RelevantPayload = ExtractRelevantText(Payload)
+                        Title, Body, AdvertiserLink = CategorizeText(RelevantPayload)
+                        AdvertisementCopies[AdID] = {
+                            'Title': Title,
+                            'Body': Body,
+                            'AdvertiserLink': AdvertiserLink,
+                            'AdvertiserID': AdDetailsFromDB[AdID]['AdvertiserID']
+                        }
                     except Exception as e:  
                         SendErrorEmail("Error: " + str(e))
-                    Payload = FlattenData(Payload.text)
-                    RelevantPayload = ExtractRelevantText(Payload)
-                    Title, Body, AdvertiserLink = CategorizeText(RelevantPayload)
-                    AdvertisementCopies[AdID] = {
-                        'Title': Title,
-                        'Body': Body,
-                        'AdvertiserLink': AdvertiserLink,
-                        'AdvertiserID': LinksFromDB[AdID]['Advertiser']
-                    }
-                    print(AdvertisementCopies)
+                        print(AdvertisementCopies)
+                        break
         
         InsertNewEntriesToDB(AdvertisementCopies)
         connection.close()
