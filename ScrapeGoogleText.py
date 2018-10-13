@@ -167,6 +167,7 @@ def CategorizeText(RelevantPayload):
     Body = ''
     AdvertiserLink = ''
     AllLinks = []
+    UnidentifiedString = ''
     TextBody = True
     for element in RelevantPayload:
         if element.startswith('https:/'):
@@ -176,18 +177,16 @@ def CategorizeText(RelevantPayload):
             elif element.endswith(RecognizedVideoFormats):
                 VideoURL = element
             AllLinks.append(element)
+        else:
+            UnidentifiedString += element + ' | '
 
-    if TextBody:
+    if TextBody and len(RelevantPayload)>3:
         AdvertiserLink = RelevantPayload.pop()
         Body = RelevantPayload.pop()
         Title = ' | '.join(RelevantPayload)
 
-    if not TextBody and len(RelevantPayload)>3:
-        print("Specia")
-        print(RelevantPayload)
 
-
-    return Title, Body, AdvertiserLink, ImageURL, VideoURL, AllLinks
+    return Title, Body, AdvertiserLink, ImageURL, VideoURL, AllLinks, UnidentifiedString
 
 
 
@@ -197,8 +196,10 @@ def InsertNewEntriesToDB(AdvertisementCopies):
     """
     Batch inserts all the data to the db.
     """
-    Query = "INSERT into ad_copies (advertisement_id, advertiser_id, title, body, advertiser_link) VALUES "
-    Params = []
+    InsertIntoAdCopiesQuery = "INSERT into ad_copies (advertisement_id, advertiser_id, title, body, advertiser_link, image_url, video_url, extra_unknown_string) VALUES "
+    ParamsForAdCopies = []
+    InsertIntoAdLinksQuery = "INSERT into all_ad_links (advertisement_id, link) VALUES "
+    ParamsForAdLinks = []
     time.sleep(3)
     for AdvertisementID in AdvertisementCopies:
         if AdvertisementCopies[AdvertisementID] != -1:
@@ -206,9 +207,19 @@ def InsertNewEntriesToDB(AdvertisementCopies):
             Body = AdvertisementCopies[AdvertisementID]['Body']
             AdvertiserLink = AdvertisementCopies[AdvertisementID]['AdvertiserLink']
             AdvertiserID = AdvertisementCopies[AdvertisementID]['AdvertiserID']
-            Params.append(cursor.mogrify("(%s, %s, %s, %s, %s)", (AdvertisementID, AdvertiserID, Title, Body, AdvertiserLink)).decode('utf-8'))
-    Query += ','.join(Params)
-    cursor.execute(Query)
+            ImageURL = AdvertisementCopies[AdvertisementID]['ImageURL']
+            VideoURL = AdvertisementCopies[AdvertisementID]['VideoURL']
+            ExtraString = AdvertisementCopies[AdvertisementID]['UnidentifiedString']
+            ParamsForAdCopies.append(cursor.mogrify("(%s, %s, %s, %s, %s, %s, %s)", (AdvertisementID, AdvertiserID, 
+                    Title, Body, AdvertiserLink, ImageURL, VideoURL, ExtraString)).decode('utf-8'))
+            
+            for link_to_insert in AdvertisementCopies[AdvertisementID]['AllLinks']:
+                ParamsForAdLinks.append(cursor.mogrify("(%s, %s)", (AdvertisementID, link_to_insert)).decode('utf-8'))
+                
+    InsertIntoAdCopiesQuery += ','.join(ParamsForAdCopies)
+    cursor.execute(InsertIntoAdCopiesQuery)
+    InsertIntoAdLinksQuery += ','.join(ParamsForAdLinks)
+    cursor.execute(InsertIntoAdLinksQuery)
     connection.commit()
 
 
@@ -234,14 +245,16 @@ if __name__ == "__main__":
                     
                         Payload = FlattenData(Payload.text)
                         RelevantPayload = ExtractRelevantText(Payload)
-                        Title, Body, AdvertiserLink, ImageURL, VideoURL, AllLinks = CategorizeText(RelevantPayload)
+                        Title, Body, AdvertiserLink, ImageURL, VideoURL, AllLinks, UnidentifiedString = CategorizeText(RelevantPayload)
                         AdvertisementCopies[AdID] = {
                             'Title': Title,
                             'Body': Body,
                             'AdvertiserLink': AdvertiserLink,
                             'AdvertiserID': AdDetailsFromDB[AdID]['AdvertiserID'],
                             'ImageURL': ImageURL,
-                            'VideoURL': VideoURL
+                            'VideoURL': VideoURL,
+                            'AllLinks': AllLinks,
+                            'UnidentifiedString': UnidentifiedString
                         }
                     except Exception as e:  
                         print(str(e))
