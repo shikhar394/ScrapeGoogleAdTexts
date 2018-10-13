@@ -73,6 +73,7 @@ def GetDetails():
     for ad_url in cursor:
         AdvertiserID, CreativeID = ExtractIDs(ad_url)
         AdDetailsFromDB[CreativeID] = {}
+        AdDetailsFromDB[CreativeID]['OriginalLink'] = ad_url
         AdDetailsFromDB[CreativeID]['Link'] = LINKWITHTEXT % (AdvertiserID, CreativeID)
         AdDetailsFromDB[CreativeID]['AdvertiserID'] = AdvertiserID
     return AdDetailsFromDB
