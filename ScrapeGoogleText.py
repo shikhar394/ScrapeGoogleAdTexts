@@ -159,11 +159,26 @@ def CategorizeText(RelevantPayload):
     Categorizes the text returned from the website. 
     As of 10/13/18, the last element is the link, the one before that is the body, the rest is the title. 
     """
-    print(RelevantPayload)
-    AdvertiserLink = RelevantPayload.pop()
-    Body = RelevantPayload.pop()
-    Title = ' | '.join(RelevantPayload)
-    return Title, Body, AdvertiserLink
+    RecognizedImageFormats = ('jpg', 'png')
+    RecognizedVideoFormats = ('mp4')
+    ImageURL = ''
+    VideoURL = ''
+    Title = ''
+    Body = ''
+    AdvertiserLink = ''
+    for element in RelevantPayload:
+        if element.endswith(RecognizedImageFormats):
+            ImageURL = element
+        elif element.endswith(RecognizedVideoFormats):
+            VideoURL = element
+
+    if len(RelevantPayload) > 3:
+        # It comes with text, body and title. 
+        AdvertiserLink = RelevantPayload.pop()
+        Body = RelevantPayload.pop()
+        Title = ' | '.join(RelevantPayload)
+        
+    return Title, Body, AdvertiserLink, ImageURL, VideoURL
 
 
 
@@ -175,7 +190,6 @@ def InsertNewEntriesToDB(AdvertisementCopies):
     """
     Query = "INSERT into ad_copies (advertisement_id, advertiser_id, title, body, advertiser_link) VALUES "
     Params = []
-    print(AdvertisementCopies)
     time.sleep(3)
     for AdvertisementID in AdvertisementCopies:
         if AdvertisementCopies[AdvertisementID] != -1:
@@ -185,7 +199,6 @@ def InsertNewEntriesToDB(AdvertisementCopies):
             AdvertiserID = AdvertisementCopies[AdvertisementID]['AdvertiserID']
             Params.append(cursor.mogrify("(%s, %s, %s, %s, %s)", (AdvertisementID, AdvertiserID, Title, Body, AdvertiserLink)).decode('utf-8'))
     Query += ','.join(Params)
-    print(Query)
     cursor.execute(Query)
     connection.commit()
 
@@ -208,19 +221,20 @@ if __name__ == "__main__":
                     
                         Payload = FlattenData(Payload.text)
                         RelevantPayload = ExtractRelevantText(Payload)
-                        Title, Body, AdvertiserLink = CategorizeText(RelevantPayload)
+                        Title, Body, AdvertiserLink, ImageURL, VideoURL = CategorizeText(RelevantPayload)
                         AdvertisementCopies[AdID] = {
                             'Title': Title,
                             'Body': Body,
                             'AdvertiserLink': AdvertiserLink,
-                            'AdvertiserID': AdDetailsFromDB[AdID]['AdvertiserID']
+                            'AdvertiserID': AdDetailsFromDB[AdID]['AdvertiserID'],
+                            'ImageURL': ImageURL,
+                            'VideoURL': VideoURL
                         }
                     except Exception as e:  
                         print(str(e))
-                        print(AdvertisementCopies)
                         print(AdDetailsFromDB[AdID])
-                        break
-        
-        InsertNewEntriesToDB(AdvertisementCopies)
+                        print(AdvertisementCopies[AdID])
+
+        #InsertNewEntriesToDB(AdvertisementCopies)
         connection.close()
 
