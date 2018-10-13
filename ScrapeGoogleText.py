@@ -167,16 +167,22 @@ def CategorizeText(RelevantPayload):
     Body = ''
     AdvertiserLink = ''
     for element in RelevantPayload:
-        if element.endswith(RecognizedImageFormats):
-            ImageURL = element
-        elif element.endswith(RecognizedVideoFormats):
-            VideoURL = element
+        if element.startswith('http'):
+            if element.endswith(RecognizedImageFormats):
+                ImageURL = element
+            elif element.endswith(RecognizedVideoFormats):
+                VideoURL = element
 
     if len(RelevantPayload) > 3:
-        # It comes with text, body and title. 
-        AdvertiserLink = RelevantPayload.pop()
-        Body = RelevantPayload.pop()
-        Title = ' | '.join(RelevantPayload)
+        # It comes with text, body and title.
+        TextBody = True
+        for element in RelevantPayload:
+            if element.startswith('https:/'):
+                TextBody = False
+        if TextBody:
+            AdvertiserLink = RelevantPayload.pop()
+            Body = RelevantPayload.pop()
+            Title = ' | '.join(RelevantPayload)
         
     return Title, Body, AdvertiserLink, ImageURL, VideoURL
 
@@ -208,11 +214,14 @@ def InsertNewEntriesToDB(AdvertisementCopies):
 
 if __name__ == "__main__":
     AdDetailsFromDB  = GetDetails() # {CreativeID: Link}
+    Count = 0
     if AdDetailsFromDB:
         AdvertisementCopies = {} # {AdvertisementID: {'Title': 'XXXX', 'Body': 'XXXX', 'AdvertiserLink': 'XXXX', 'AdvertiserID': 'XXX'}}
         CacheExistingAdIDs(AdvertisementCopies)
         with requests.session() as Session:
             for AdID in AdDetailsFromDB:
+                Count += 1
+                print("Ad # ", Count, " out of ", len(AdDetailsFromDB))
                 if not AdvertisementCopies.get(AdID, False):
                     try:
                         Payload = Session.get(AdDetailsFromDB[AdID]['Link'])
